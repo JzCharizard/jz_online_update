@@ -23,8 +23,8 @@ set -o pipefail
 
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/JzCharizard/jz_online_update/master"
 MANIFEST_NAME="file_manifest.json"
-# 安装包固定 URL: 始终同一个 Release, 每次发版覆盖上传该文件
-PACKAGE_URL="https://github.com/JzCharizard/jz_online_update/releases/download/v1.0.0/jz_offline_installer.sh.tar.gz"
+# 安装包固定 URL: 7z 加密, 始终同一个 Release, 每次发版覆盖上传该文件
+PACKAGE_URL="https://github.com/JzCharizard/jz_online_update/releases/download/v1.0.0/jz_offline_installer.sh.7z"
 
 SYSTEM_MANIFEST="/etc/init.d/file_manifest.json"
 ALGO="sha256"
@@ -33,6 +33,7 @@ CLEAN=1
 
 WORK_DIR=""
 TMP=""
+PASSWORD=""
 
 log() {
     printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S.%3N')" "$*"
@@ -67,11 +68,52 @@ while [ $# -gt 0 ]; do
 done
 
 HASH_CMD="${ALGO}sum"
-for c in "$HASH_CMD" tar find sort awk sed grep paste; do
+for c in "$HASH_CMD" find sort awk sed grep paste; do
     command -v "$c" >/dev/null 2>&1 || { log "错误: 缺少命令: $c" >&2; exit 1; }
 done
 command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 \
     || { log "错误: 需要 curl 或 wget" >&2; exit 1; }
+
+# 7z 命令探测(解密安装包用): 7z / 7za / 7zr 任一即可
+SEVENZIP=""
+for z in 7z 7za 7zr; do
+    command -v "$z" >/dev/null 2>&1 && { SEVENZIP="$z"; break; }
+done
+
+# 读取安装包密码(优先环境变量 JZ_PASS, 否则从 /dev/tty 隐藏输入)
+prompt_password() {
+    if [ -n "${JZ_PASS:-}" ]; then PASSWORD="$JZ_PASS"; return 0; fi
+    if [ -r /dev/tty ]; then
+        printf '请输入安装包密码: ' > /dev/tty
+        IFS= read -rs PASSWORD < /dev/tty
+        printf '\n' > /dev/tty
+    else
+        log "错误: 需要密码但无法读取(无 /dev/tty); 可用 JZ_PASS 环境变量传入" >&2
+        exit 1
+    fi
+    [ -n "$PASSWORD" ] || { log "错误: 密码为空" >&2; exit 1; }
+}
+
+# 用 7z 解密解压 archive 到 outdir(密码错误可重输, 最多 3 次; 用尽则删除下载文件并退出)
+extract_7z() {
+    local archive=$1 outdir=$2 attempt
+    for attempt in 1 2 3; do
+        if "$SEVENZIP" x -p"$PASSWORD" -o"$outdir" -y "$archive" >/dev/null 2>&1; then
+            return 0
+        fi
+        log "密码错误或安装包损坏 (第 ${attempt}/3 次)" >&2
+        if [ "$attempt" -lt 3 ] && [ -z "${JZ_PASS:-}" ] && [ -r /dev/tty ]; then
+            log "请重新输入密码" >&2
+            rm -rf "${outdir:?}"/* 2>/dev/null
+            prompt_password
+        else
+            break
+        fi
+    done
+    log "错误: 密码已连续输错 3 次(或安装包损坏), 退出并删除已下载文件" >&2
+    rm -rf "$TMP" "$WORK_DIR" 2>/dev/null
+    exit 1
+}
 
 download_file() {
     local url=$1 dest=$2
@@ -267,36 +309,26 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # ----------------------------------------------------------------------------
-# 4) 下载安装包并刷新
+# 4) 下载加密安装包(7z), 输入密码解压, 刷新到 dst
 # ----------------------------------------------------------------------------
+[ -n "$SEVENZIP" ] || { log "错误: 需要 7z, 请先安装: apt-get install -y p7zip-full" >&2; exit 1; }
+
 download_file "$PACKAGE_URL" "$PACKAGE" || exit 1
 
+prompt_password
 TMP=$(mktemp -d)
+log "==> 解密解压安装包(7z)"
+extract_7z "$PACKAGE" "$TMP"
 
-log "==> 读取安装包内容清单"
-LISTING=$(tar tf "$PACKAGE") || { log "错误: 无法读取安装包" >&2; exit 1; }
-TOPDIR=$(printf '%s\n' "$LISTING" | head -1 | cut -d/ -f1)
-
-resolve_member() {
-    local s=$1 cand
-    for cand in "$s" "./$s" "${TOPDIR}/$s" "./${TOPDIR}/$s"; do
-        if printf '%s\n' "$LISTING" | awk -v c="$cand" 'BEGIN{f=1} $0==c || index($0,c"/")==1 {f=0} END{exit f}'; then
-            printf '%s' "$cand"; return 0
-        fi
-    done
+# 在解压出的目录树中定位 src 对应文件/目录(自动兼容顶层目录前缀)
+pkg_path() {
+    local s=$1 p
+    p="${TMP}/${s}"
+    [ -e "$p" ] && { printf '%s' "$p"; return 0; }
+    p=$(find "$TMP" -path "*/$s" 2>/dev/null | head -1)
+    [ -n "$p" ] && { printf '%s' "$p"; return 0; }
     return 1
 }
-
-declare -A MEMBER
-members=()
-for s in "${NEEDS[@]}"; do
-    m=$(resolve_member "$s") || { log "错误: 安装包内找不到 src: $s" >&2; exit 1; }
-    MEMBER["$s"]="$m"
-    members+=("$m")
-done
-
-log "==> 从安装包解压 ${#members[@]} 个成员"
-tar xf "$PACKAGE" -C "$TMP" "${members[@]}" || { log "错误: 解压失败" >&2; exit 1; }
 
 patch_one_file() {
     local sp=$1 dp=$2 mode=$3 owner=$4
@@ -326,7 +358,7 @@ patch_folder_sync() {
 
 log "==> 开始刷新"
 for s in "${NEEDS[@]}"; do
-    sp="${TMP}/${MEMBER[$s]}"
+    sp=$(pkg_path "$s") || { log "错误: 安装包内找不到: $s" >&2; exit 1; }
     dp="${LAT_DST[$s]}"
     t="${LAT_TYPE[$s]}"
     md="${LAT_MODE[$s]}"
