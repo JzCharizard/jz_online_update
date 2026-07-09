@@ -3,10 +3,10 @@
 # jz_online_updater_github.sh
 #
 # 在线更新脚本 (GitHub 版), 托管于 GitHub:
-#   https://raw.githubusercontent.com/ljhHui/jz_online_update/master/jz_online_updater_github.sh
+#   https://raw.githubusercontent.com/JzCharizard/jz_online_update/master/jz_online_updater_github.sh
 #
 # 目标机一键执行:
-#   curl -fsSL https://raw.githubusercontent.com/ljhHui/jz_online_update/master/jz_online_updater_github.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/JzCharizard/jz_online_update/master/jz_online_updater_github.sh | sudo bash
 #   curl -fsSL .../jz_online_updater_github.sh | sudo bash -s -- --dry-run
 #
 # 流程:
@@ -21,10 +21,10 @@
 
 set -o pipefail
 
-GITHUB_RAW_BASE="https://raw.githubusercontent.com/ljhHui/jz_online_update/master"
+GITHUB_RAW_BASE="https://raw.githubusercontent.com/JzCharizard/jz_online_update/master"
 MANIFEST_NAME="file_manifest.json"
 # 安装包固定 URL: 始终同一个 Release, 每次发版覆盖上传该文件
-PACKAGE_URL="https://github.com/ljhHui/jz_online_update/releases/download/v1.0.0/jz_offline_installer.sh.tar.gz"
+PACKAGE_URL="https://github.com/JzCharizard/jz_online_update/releases/download/v1.0.0/jz_offline_installer.sh.tar.gz"
 
 SYSTEM_MANIFEST="/etc/init.d/file_manifest.json"
 ALGO="sha256"
@@ -43,7 +43,7 @@ usage() {
 jz_online_updater_github.sh - GitHub 在线更新
 
 用法:
-  curl -fsSL https://raw.githubusercontent.com/ljhHui/jz_online_update/master/jz_online_updater_github.sh | sudo bash
+  curl -fsSL https://raw.githubusercontent.com/JzCharizard/jz_online_update/master/jz_online_updater_github.sh | sudo bash
   curl -fsSL .../jz_online_updater_github.sh | sudo bash -s -- --dry-run
   curl -fsSL .../jz_online_updater_github.sh | sudo bash -s -- --no-clean
 
