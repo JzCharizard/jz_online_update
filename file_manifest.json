@@ -1,0 +1,104 @@
+{
+  "version": "v2.0.32",
+  "algorithm": "sha256",
+  "generated_at": "2026-07-08T15:36:08+08:00",
+  "count": 12,
+  "files": [
+    {
+      "src": "bin/sniff",
+      "dst": "/etc/init.d/sniff",
+      "type": "file",
+      "mode": "755",
+      "owner": "root",
+      "hash": "87a393c0d7861c18d16f76e92020999bca9f4a8f26f1a5f3c3142cf79e776d5c"
+    },
+    {
+      "src": "bin/sniff_daemon",
+      "dst": "/etc/init.d/sniff_daemon",
+      "type": "file",
+      "mode": "755",
+      "owner": "root",
+      "hash": "ab46ba03263ecac9b934cc7eca00b45d25e5b0fa9939b53c4ee8e7b958cc9a48"
+    },
+    {
+      "src": "etc/init.d/backup_configuration.sh",
+      "dst": "/etc/init.d/backup_configuration.sh",
+      "type": "file",
+      "mode": "755",
+      "owner": "root",
+      "hash": "8e4818bd5643a2157f95f36bb2f1b26e0aea0ef64da06dd6b80d49ed22b20171"
+    },
+    {
+      "src": "etc/init.d/check_net.sh",
+      "dst": "/etc/init.d/check_net.sh",
+      "type": "file",
+      "mode": "755",
+      "owner": "root",
+      "hash": "4e788775b928a774859e125ec706c0144b171108effb87eb51bf694748ee24ca"
+    },
+    {
+      "src": "etc/init.d/cleanup.sh",
+      "dst": "/home/jzzn/cleanup.sh",
+      "type": "file",
+      "mode": "755",
+      "owner": "root",
+      "hash": "9b23a21a56e90d17a95aa875192e48697b010b82265a46134cb1add41616ac43"
+    },
+    {
+      "src": "etc/init.d/editRange.sh",
+      "dst": "/home/jzzn/editRange.sh",
+      "type": "file",
+      "mode": "755",
+      "owner": "root",
+      "hash": "45faebd0dea609fd6b2f62dd1013a37646e2eb118f8b855f35ff297ed947e64e"
+    },
+    {
+      "src": "etc/init.d/jzdiag.sh",
+      "dst": "/etc/init.d/jzdiag.sh",
+      "type": "file",
+      "mode": "755",
+      "owner": "root",
+      "hash": "2b14ce852e5314a57b8c06427e87e9f1ee24caba81887d967295884ffee81e6c"
+    },
+    {
+      "src": "etc/init.d/restore_configuration.sh",
+      "dst": "/etc/init.d/restore_configuration.sh",
+      "type": "file",
+      "mode": "755",
+      "owner": "root",
+      "hash": "afbb5ae1cf4a3e103efed163e88406f88812ad2132026209fa2359930e25b694"
+    },
+    {
+      "src": "java/controller-1.0.0/bin",
+      "dst": "/root/controller-1.0.0/bin",
+      "type": "folder",
+      "mode": "755:755",
+      "owner": "root",
+      "hash": "177eebdf1eeb82151682727f2819decbc197dcc7b6aa1ccda1ffbe1590595bd9"
+    },
+    {
+      "src": "java/controller-1.0.0/etc",
+      "dst": "/root/controller-1.0.0/etc",
+      "type": "folder",
+      "mode": "755:644",
+      "owner": "root",
+      "hash": "1590f5d9f67fd9f0b45c1223c173a805cb3c95cb70ec267a3d7712cdd6b559cd"
+    },
+    {
+      "src": "java/controller-1.0.0/lib",
+      "dst": "/root/controller-1.0.0/lib",
+      "type": "folder",
+      "mode": "755:644",
+      "owner": "root",
+      "hash": "c3c6315b00d9b6f0430741bc1b845f000567bfc41624f992e351d8ca258934f9"
+    },
+    {
+      "src": "logrotate.d/sniff",
+      "dst": "/etc/logrotate.d/sniff",
+      "type": "file",
+      "mode": "644",
+      "owner": "root",
+      "hash": "537a5f60f72a55682a0b3ad8d6afee62c576f1b8247f3a4444bd1e45e4ba079c"
+    }
+  ]
+}
