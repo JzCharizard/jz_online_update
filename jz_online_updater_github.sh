@@ -116,14 +116,24 @@ extract_7z() {
 }
 
 download_file() {
-    local url=$1 dest=$2
+    local url=$1 dest=$2 show=${3:-0}
     log "==> 下载: $url"
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL --connect-timeout 30 --max-time 1800 -o "$dest" "$url" \
-            || { log "错误: 下载失败: $url" >&2; return 1; }
+        if [ "$show" -eq 1 ]; then
+            curl -fL --progress-bar --connect-timeout 30 --max-time 3600 -o "$dest" "$url" \
+                || { log "错误: 下载失败: $url" >&2; return 1; }
+        else
+            curl -fsSL --connect-timeout 30 --max-time 1800 -o "$dest" "$url" \
+                || { log "错误: 下载失败: $url" >&2; return 1; }
+        fi
     else
-        wget -q -O "$dest" "$url" \
-            || { log "错误: 下载失败: $url" >&2; return 1; }
+        if [ "$show" -eq 1 ]; then
+            wget -q --show-progress --progress=bar:force --timeout=30 -O "$dest" "$url" \
+                || { log "错误: 下载失败: $url" >&2; return 1; }
+        else
+            wget -q -O "$dest" "$url" \
+                || { log "错误: 下载失败: $url" >&2; return 1; }
+        fi
     fi
     [ -s "$dest" ] || { log "错误: 下载结果为空: $url" >&2; return 1; }
 }
@@ -313,7 +323,7 @@ fi
 # ----------------------------------------------------------------------------
 [ -n "$SEVENZIP" ] || { log "错误: 需要 7z, 请先安装: apt-get install -y p7zip-full" >&2; exit 1; }
 
-download_file "$PACKAGE_URL" "$PACKAGE" || exit 1
+download_file "$PACKAGE_URL" "$PACKAGE" 1 || exit 1
 
 prompt_password
 TMP=$(mktemp -d)
