@@ -330,12 +330,25 @@ TMP=$(mktemp -d)
 log "==> 解密解压安装包(7z)"
 extract_7z "$PACKAGE" "$TMP"
 
-# 在解压出的目录树中定位 src 对应文件/目录(自动兼容顶层目录前缀)
+# 定位包根, 兼容两种打包结构:
+#   1) 直接打包内容    -> 包根即 TMP
+#   2) 打包整个文件夹  -> 包根为 TMP/<顶层目录>
+# 以含 jz_offline_installer.sh 的目录(层级最浅者)为包根; 找不到则回退 TMP
+PKG_ROOT=$(find "$TMP" -type f -name "jz_offline_installer.sh" 2>/dev/null \
+    | awk -F/ '{print NF" "$0}' | sort -n | head -1 | cut -d' ' -f2-)
+if [ -n "$PKG_ROOT" ]; then
+    PKG_ROOT=$(dirname "$PKG_ROOT")
+else
+    PKG_ROOT="$TMP"
+fi
+log "==> 包根目录: $PKG_ROOT"
+
+# 在包根下定位 src 对应文件/目录(先精确匹配, 再兜底按路径尾匹配)
 pkg_path() {
     local s=$1 p
-    p="${TMP}/${s}"
+    p="${PKG_ROOT}/${s}"
     [ -e "$p" ] && { printf '%s' "$p"; return 0; }
-    p=$(find "$TMP" -path "*/$s" 2>/dev/null | head -1)
+    p=$(find "$PKG_ROOT" -path "*/$s" 2>/dev/null | head -1)
     [ -n "$p" ] && { printf '%s' "$p"; return 0; }
     return 1
 }
