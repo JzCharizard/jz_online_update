@@ -3,28 +3,28 @@
 # jz_online_updater_github.sh
 #
 # 在线更新脚本 (GitHub 版), 托管于 GitHub:
-#   https://raw.githubusercontent.com/JzCharizard/jz_online_update/master/jz_online_updater_github.sh
+#   https://raw.githubusercontent.com/JzCharizard/jz_online_update/main/jz_online_updater_github.sh
 #
 # 目标机一键执行:
-#   curl -fsSL https://raw.githubusercontent.com/JzCharizard/jz_online_update/master/jz_online_updater_github.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/JzCharizard/jz_online_update/main/jz_online_updater_github.sh | sudo bash
 #   curl -fsSL .../jz_online_updater_github.sh | sudo bash -s -- --dry-run
 #
 # 流程:
 #   1. 从 GitHub 下载最新 file_manifest.json;
-#   2. 下载固定 Release 的安装包(始终为同一个版本, 每次发版覆盖上传);
+#   2. 下载当前 Release 的加密 7z 更新包;
 #   3. 与当前系统比对; 不一致则从安装包刷新 dst(逻辑同 jz_offline_updater.sh);
 #   4. 成功后更新 /etc/init.d/file_manifest.json;
 #   5. 成功后自动删除临时下载目录(管道执行无本地脚本文件, 仅清临时文件)。
 #
-# 依赖: bash(4+)、curl 或 wget、coreutils、tar、grep、sed、awk、find、sort、paste。
+# 依赖: bash(4+)、curl 或 wget、7z、coreutils、grep、sed、awk、find、sort、paste。
 # 需要 root 权限(--dry-run 除外)。
 
 set -o pipefail
 
-GITHUB_RAW_BASE="https://raw.githubusercontent.com/JzCharizard/jz_online_update/master"
+GITHUB_RAW_BASE="https://raw.githubusercontent.com/JzCharizard/jz_online_update/main"
 MANIFEST_NAME="file_manifest.json"
-# 安装包固定 URL: 7z 加密, 始终同一个 Release, 每次发版覆盖上传该文件
-PACKAGE_URL="https://github.com/JzCharizard/jz_online_update/releases/download/v1.0.0/jz_offline_installer.sh.7z"
+# 更新包 URL: 每次发版创建下一版 Release, 并同步修改这里的版本号
+PACKAGE_URL="https://github.com/JzCharizard/jz_online_update/releases/download/v1.0.1/jz_offline_installer.sh.7z"
 
 SYSTEM_MANIFEST="/etc/init.d/file_manifest.json"
 ALGO="sha256"
@@ -44,7 +44,7 @@ usage() {
 jz_online_updater_github.sh - GitHub 在线更新
 
 用法:
-  curl -fsSL https://raw.githubusercontent.com/JzCharizard/jz_online_update/master/jz_online_updater_github.sh | sudo bash
+  curl -fsSL https://raw.githubusercontent.com/JzCharizard/jz_online_update/main/jz_online_updater_github.sh | sudo bash
   curl -fsSL .../jz_online_updater_github.sh | sudo bash -s -- --dry-run
   curl -fsSL .../jz_online_updater_github.sh | sudo bash -s -- --no-clean
 
@@ -79,7 +79,6 @@ SEVENZIP=""
 for z in 7z 7za 7zr; do
     command -v "$z" >/dev/null 2>&1 && { SEVENZIP="$z"; break; }
 done
-
 # 读取安装包密码(优先环境变量 JZ_PASS, 否则从 /dev/tty 隐藏输入)
 prompt_password() {
     if [ -n "${JZ_PASS:-}" ]; then PASSWORD="$JZ_PASS"; return 0; fi
@@ -215,7 +214,7 @@ MANIFEST_URL="${GITHUB_RAW_BASE}/${MANIFEST_NAME}"
 log "==> 在线更新开始 (工作目录: $WORK_DIR)"
 download_file "$MANIFEST_URL" "$MANIFEST" || exit 1
 
-# version 仅作展示/记录用途(不影响下载, 安装包 URL 固定)
+# version 用于展示和记录; 更新包 Release URL 由发布流程同步维护
 VERSION=$(grep '"version":' "$MANIFEST" | head -1 | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p')
 PACKAGE="${WORK_DIR}/${PACKAGE_URL##*/}"
 
