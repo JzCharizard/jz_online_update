@@ -24,7 +24,7 @@ set -o pipefail
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/JzCharizard/jz_online_update/main"
 MANIFEST_NAME="file_manifest.json"
 # 更新包 URL: 每次发版创建下一版 Release, 并同步修改这里的版本号
-PACKAGE_URL="https://github.com/JzCharizard/jz_online_update/releases/download/v1.0.1/jz_offline_installer.sh.7z"
+PACKAGE_URL="https://github.com/JzCharizard/jz_online_update/releases/download/v1.0.2/jz_offline_installer.sh.7z"
 
 SYSTEM_MANIFEST="/etc/init.d/file_manifest.json"
 ALGO="sha256"

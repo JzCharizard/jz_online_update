@@ -1,7 +1,7 @@
 {
-  "version": "v2.0.32",
+  "version": "v2.0.33",
   "algorithm": "sha256",
-  "generated_at": "2026-07-20T15:44:50+08:00",
+  "generated_at": "2026-07-27T15:00:13+08:00",
   "count": 12,
   "files": [
     {
@@ -10,7 +10,7 @@
       "type": "file",
       "mode": "755",
       "owner": "root",
-      "hash": "87a393c0d7861c18d16f76e92020999bca9f4a8f26f1a5f3c3142cf79e776d5c"
+      "hash": "47e2cf7f6775413f2e4a4d79e3ce71fa621b12c99d4aa4aea0715d22aaca3cf8"
     },
     {
       "src": "bin/sniff_daemon",
@@ -18,7 +18,7 @@
       "type": "file",
       "mode": "755",
       "owner": "root",
-      "hash": "ab46ba03263ecac9b934cc7eca00b45d25e5b0fa9939b53c4ee8e7b958cc9a48"
+      "hash": "0077db2a896eb6a0bfd430cfbad2dee338c2e4ac8f4ebba0b970953377108282"
     },
     {
       "src": "etc/init.d/backup_configuration.sh",
