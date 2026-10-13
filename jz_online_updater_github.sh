@@ -5,11 +5,12 @@
 
 set -uo pipefail
 
-RELEASE_TAG="v1.0.3"
+RELEASE_TAG="v1.0.4"
 PRODUCT_VERSION="v1.2.9"
 PACKAGE_NAME="jzzn-v1.2.9-update-linux-x86_64.7z"
 PACKAGE_URL="https://github.com/JzCharizard/jz_online_update/releases/download/${RELEASE_TAG}/${PACKAGE_NAME}"
-PACKAGE_SHA256="75b9b0f4154c7b2e0d4bd0468a1eabc0637a2a3d71030b2e460f225b32a55a14"
+PACKAGE_SHA256="85d5041e4e15d2938be85150a8141e150390c7e1942b42d7aa5696d46d94aab7"
+DOWNLOAD_HOST="github.com"
 REQUIRED_PACKAGES="vim nano curl wget git htop bash-completion unzip iputils-ping net-tools traceroute dnsutils tcpdump build-essential"
 
 KEEP=0
@@ -109,19 +110,51 @@ install_runtime_dependencies() {
     [ -n "$SEVENZIP" ] || fail "安装后仍未找到 7z 命令"
 }
 
-download_package() {
-    local destination=$1
-    log "下载 ${PRODUCT_VERSION} 更新包: $PACKAGE_URL"
-    if command -v curl >/dev/null 2>&1; then
-        curl -fL --progress-bar --connect-timeout 30 --max-time 3600 \
-            -o "$destination" "$PACKAGE_URL" || fail "更新包下载失败"
-    elif command -v wget >/dev/null 2>&1; then
-        wget --progress=bar:force --timeout=30 -O "$destination" "$PACKAGE_URL" \
-            || fail "更新包下载失败"
-    else
-        fail "未找到 curl 或 wget"
+wait_for_download_host() {
+    local attempt
+    if ! command -v getent >/dev/null 2>&1; then
+        log "未找到 getent，跳过下载域名预检查"
+        return 0
     fi
-    [ -s "$destination" ] || fail "下载到的更新包为空"
+    for attempt in 1 2 3 4 5 6; do
+        if getent ahosts "$DOWNLOAD_HOST" >/dev/null 2>&1 \
+            || getent hosts "$DOWNLOAD_HOST" >/dev/null 2>&1; then
+            return 0
+        fi
+        log "暂时无法解析 ${DOWNLOAD_HOST}，等待后重试（${attempt}/6）"
+        if [ "$attempt" -eq 2 ] && command -v resolvectl >/dev/null 2>&1; then
+            resolvectl flush-caches >/dev/null 2>&1 || true
+        fi
+        if [ "$attempt" -eq 3 ] \
+            && command -v systemctl >/dev/null 2>&1 \
+            && systemctl is-active --quiet systemd-resolved; then
+            log "重启 systemd-resolved 以恢复域名解析"
+            systemctl restart systemd-resolved >/dev/null 2>&1 || true
+        fi
+        sleep 5
+    done
+    fail "无法解析下载域名 ${DOWNLOAD_HOST}；请检查 DNS 或网络连接后重试"
+}
+
+download_package() {
+    local destination=$1 attempt
+    log "下载 ${PRODUCT_VERSION} 更新包: $PACKAGE_URL"
+    for attempt in 1 2 3 4 5; do
+        wait_for_download_host
+        rm -f "$destination"
+        if command -v curl >/dev/null 2>&1; then
+            curl -fL --progress-bar --connect-timeout 30 --max-time 3600 \
+                -o "$destination" "$PACKAGE_URL" && [ -s "$destination" ] && return 0
+        elif command -v wget >/dev/null 2>&1; then
+            wget --progress=bar:force --timeout=30 --tries=1 \
+                -O "$destination" "$PACKAGE_URL" && [ -s "$destination" ] && return 0
+        else
+            fail "未找到 curl 或 wget"
+        fi
+        log "更新包下载失败，5 秒后重试（${attempt}/5）" >&2
+        sleep 5
+    done
+    fail "更新包连续下载失败"
 }
 
 verify_package() {
@@ -134,16 +167,21 @@ verify_package() {
 }
 
 read_password() {
+    local empty_attempt
     if [ -n "${JZ_PASS:-}" ]; then
         PASSWORD=$JZ_PASS
         return 0
     fi
     [ -r /dev/tty ] \
         || fail "无法读取密码；请使用 JZ_PASS 环境变量传入"
-    printf '请输入更新包密码: ' > /dev/tty
-    IFS= read -rs PASSWORD < /dev/tty
-    printf '\n' > /dev/tty
-    [ -n "$PASSWORD" ] || fail "密码不能为空"
+    for empty_attempt in 1 2 3; do
+        printf '请输入更新包密码: ' > /dev/tty
+        IFS= read -rs PASSWORD < /dev/tty
+        printf '\n' > /dev/tty
+        [ -n "$PASSWORD" ] && return 0
+        log "密码不能为空（第 ${empty_attempt}/3 次）" >&2
+    done
+    fail "连续三次未输入密码"
 }
 
 extract_package() {
