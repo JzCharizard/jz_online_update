@@ -5,11 +5,11 @@
 
 set -uo pipefail
 
-RELEASE_TAG="v1.2.9"
-PRODUCT_VERSION="v1.2.9"
-PACKAGE_NAME="jzzn-v1.2.9-update-linux-x86_64.7z"
+RELEASE_TAG="v1.2.12"
+PRODUCT_VERSION="v1.2.12"
+PACKAGE_NAME="jzzn-v1.2.12-update-linux-x86_64.7z"
 PACKAGE_URL="https://github.com/JzCharizard/jz_online_update/releases/download/${RELEASE_TAG}/${PACKAGE_NAME}"
-PACKAGE_SHA256="2c73c35c78ee17e5ce6b9ad5b6119de2a7d1696ad51760ad2714cc6c78f3d44e"
+PACKAGE_SHA256="19e516dcc4a1f2a1a3ee00e0bb021861c44f65cb94dae5249506d017f7b7a48c"
 DOWNLOAD_HOST="github.com"
 REQUIRED_PACKAGES="vim nano curl wget git htop bash-completion unzip iputils-ping net-tools traceroute dnsutils tcpdump build-essential"
 
