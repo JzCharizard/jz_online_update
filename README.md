@@ -1,27 +1,27 @@
-# JZZN Sniff GitHub 在线更新
+# JZZN Sniff GitHub Online Updater
 
-本仓库提供 JZZN Sniff 的 GitHub 在线更新入口。当前产品版本为 **v1.2.9**，在线发布版本为 **v1.0.4**。
+This repository provides the GitHub online-update entry point for JZZN Sniff. The product and online release versions are both **v1.2.9**.
 
-## 使用方法
+## Usage
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/JzCharizard/jz_online_update/main/jz_online_updater_github.sh | sudo bash
 ```
 
-脚本会依次完成：
+The updater performs the following steps:
 
-1. 检查并自动安装运行依赖；
-2. 从本仓库 Release 下载加密更新包；
-3. 校验更新包 SHA256；
-4. 提示输入更新包密码并解压；
-5. 备份数据库与旧文件，升级到 v1.2.9；
-6. 切换到 systemd，并在验证成功后删除旧 SysV/`rc.local` 核心启动项。
+1. Checks and installs runtime dependencies when necessary.
+2. Downloads the encrypted update package from the GitHub Release.
+3. Verifies the package SHA256.
+4. Prompts for the package password and extracts the package.
+5. Backs up the database and legacy files, then upgrades to v1.2.9.
+6. Migrates to systemd and removes legacy SysV/`rc.local` startup entries only after validation succeeds.
 
-更新失败时会保留临时目录。升级审计日志位于 `/var/log/jzzn-install.log`，系统与数据库备份位于 `/root/jzzn-upgrade-backup/`。
+Failed updates retain the temporary directory. The audit log is stored at `/var/log/jzzn-install.log`, and system/database backups are stored under `/root/jzzn-upgrade-backup/`.
 
-## 参数
+## Options
 
-- `--keep`：成功后也保留临时下载目录。
-- `JZ_PASS`：可通过环境变量非交互传入更新包密码；普通现场执行建议交互输入。
+- `--keep`: Retain the temporary download directory after a successful update.
+- `JZ_PASS`: Supply the update-package password non-interactively through an environment variable; interactive entry is recommended for normal field use.
 
-本次发布不再使用旧的 `file_manifest.json` 增量覆盖方式。
+This release no longer uses the legacy `file_manifest.json` incremental-overlay workflow.

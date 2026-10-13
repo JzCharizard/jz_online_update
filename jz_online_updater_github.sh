@@ -5,11 +5,11 @@
 
 set -uo pipefail
 
-RELEASE_TAG="v1.0.4"
+RELEASE_TAG="v1.2.9"
 PRODUCT_VERSION="v1.2.9"
 PACKAGE_NAME="jzzn-v1.2.9-update-linux-x86_64.7z"
 PACKAGE_URL="https://github.com/JzCharizard/jz_online_update/releases/download/${RELEASE_TAG}/${PACKAGE_NAME}"
-PACKAGE_SHA256="85d5041e4e15d2938be85150a8141e150390c7e1942b42d7aa5696d46d94aab7"
+PACKAGE_SHA256="6442d87dc795a6026bafa205368b2946ba4a9e2ca1a18ba0fb13836410a65fe3"
 DOWNLOAD_HOST="github.com"
 REQUIRED_PACKAGES="vim nano curl wget git htop bash-completion unzip iputils-ping net-tools traceroute dnsutils tcpdump build-essential"
 
@@ -23,21 +23,21 @@ log() {
 }
 
 fail() {
-    log "错误: $*" >&2
+    log "Error: $*" >&2
     exit 1
 }
 
 usage() {
     cat <<'EOF'
-JZZN Sniff GitHub 在线更新
+JZZN Sniff GitHub Online Updater
 
-用法：
+Usage:
   curl -fsSL https://raw.githubusercontent.com/JzCharizard/jz_online_update/main/jz_online_updater_github.sh | sudo bash
-  curl -fsSL .../jz_online_updater_github.sh | sudo env JZ_PASS='更新包密码' bash
+  curl -fsSL .../jz_online_updater_github.sh | sudo env JZ_PASS='update-package-password' bash
 
-选项：
-  --keep       更新完成后保留临时目录，便于排查
-  -h, --help   显示帮助
+Options:
+  --keep       Keep the temporary directory after a successful update
+  -h, --help   Show this help
 EOF
 }
 
@@ -45,18 +45,18 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --keep|--no-clean) KEEP=1 ;;
         -h|--help) usage; exit 0 ;;
-        *) fail "未知参数: $1" ;;
+        *) fail "unknown argument: $1" ;;
     esac
     shift
 done
 
-[ "$(id -u)" = "0" ] || fail "请使用 root 权限执行（curl ... | sudo bash）"
+[ "$(id -u)" = "0" ] || fail "run as root (curl ... | sudo bash)"
 
 cleanup() {
     local rc=$?
     if [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
         if [ "$KEEP" -eq 1 ] || [ "$rc" -ne 0 ]; then
-            log "临时目录已保留: $WORK_DIR"
+            log "Temporary directory retained: $WORK_DIR"
         else
             rm -rf "$WORK_DIR"
         fi
@@ -68,9 +68,9 @@ install_runtime_dependencies() {
     local package missing=""
 
     command -v dpkg-query >/dev/null 2>&1 \
-        || fail "当前系统不支持 dpkg-query；此在线更新包仅支持 Debian/Ubuntu 系统"
+        || fail "dpkg-query is unavailable; this updater supports Debian/Ubuntu only"
     command -v apt-get >/dev/null 2>&1 \
-        || fail "当前系统未找到 apt-get；无法自动安装运行依赖"
+        || fail "apt-get is unavailable; runtime dependencies cannot be installed automatically"
 
     for package in $REQUIRED_PACKAGES; do
         if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q '^install ok installed$'; then
@@ -89,16 +89,16 @@ install_runtime_dependencies() {
     fi
 
     if [ -n "$missing" ]; then
-        log "检测到缺少的软件包:${missing}"
-        log "执行 apt-get update"
+        log "Missing packages detected:${missing}"
+        log "Running apt-get update"
         DEBIAN_FRONTEND=noninteractive apt-get update \
-            || fail "apt-get update 失败"
-        log "安装在线更新所需依赖"
+            || fail "apt-get update failed"
+        log "Installing online-update dependencies"
         # shellcheck disable=SC2086
         DEBIAN_FRONTEND=noninteractive apt-get install -y $REQUIRED_PACKAGES p7zip-full \
-            || fail "依赖安装失败"
+            || fail "dependency installation failed"
     else
-        log "运行依赖检查通过"
+        log "Runtime dependency check passed"
     fi
 
     for candidate in 7z 7za 7zr; do
@@ -107,13 +107,13 @@ install_runtime_dependencies() {
             break
         fi
     done
-    [ -n "$SEVENZIP" ] || fail "安装后仍未找到 7z 命令"
+    [ -n "$SEVENZIP" ] || fail "7z command is still unavailable after dependency installation"
 }
 
 wait_for_download_host() {
     local attempt
     if ! command -v getent >/dev/null 2>&1; then
-        log "未找到 getent，跳过下载域名预检查"
+        log "getent is unavailable; skipping the download-host precheck"
         return 0
     fi
     for attempt in 1 2 3 4 5 6; do
@@ -121,24 +121,24 @@ wait_for_download_host() {
             || getent hosts "$DOWNLOAD_HOST" >/dev/null 2>&1; then
             return 0
         fi
-        log "暂时无法解析 ${DOWNLOAD_HOST}，等待后重试（${attempt}/6）"
+        log "Unable to resolve ${DOWNLOAD_HOST}; waiting before retry (${attempt}/6)"
         if [ "$attempt" -eq 2 ] && command -v resolvectl >/dev/null 2>&1; then
             resolvectl flush-caches >/dev/null 2>&1 || true
         fi
         if [ "$attempt" -eq 3 ] \
             && command -v systemctl >/dev/null 2>&1 \
             && systemctl is-active --quiet systemd-resolved; then
-            log "重启 systemd-resolved 以恢复域名解析"
+            log "Restarting systemd-resolved to recover name resolution"
             systemctl restart systemd-resolved >/dev/null 2>&1 || true
         fi
         sleep 5
     done
-    fail "无法解析下载域名 ${DOWNLOAD_HOST}；请检查 DNS 或网络连接后重试"
+    fail "cannot resolve ${DOWNLOAD_HOST}; check DNS/network connectivity and retry"
 }
 
 download_package() {
     local destination=$1 attempt
-    log "下载 ${PRODUCT_VERSION} 更新包: $PACKAGE_URL"
+    log "Downloading the ${PRODUCT_VERSION} update package: $PACKAGE_URL"
     for attempt in 1 2 3 4 5; do
         wait_for_download_host
         rm -f "$destination"
@@ -149,21 +149,21 @@ download_package() {
             wget --progress=bar:force --timeout=30 --tries=1 \
                 -O "$destination" "$PACKAGE_URL" && [ -s "$destination" ] && return 0
         else
-            fail "未找到 curl 或 wget"
+            fail "neither curl nor wget is available"
         fi
-        log "更新包下载失败，5 秒后重试（${attempt}/5）" >&2
+        log "Package download failed; retrying in 5 seconds (${attempt}/5)" >&2
         sleep 5
     done
-    fail "更新包连续下载失败"
+    fail "package download failed after all retries"
 }
 
 verify_package() {
     local archive=$1 actual
     actual=$(sha256sum "$archive" | awk '{print $1}') \
-        || fail "无法计算更新包 SHA256"
+        || fail "cannot calculate the package SHA256"
     [ "$actual" = "$PACKAGE_SHA256" ] \
-        || fail "更新包 SHA256 不匹配（期望 $PACKAGE_SHA256，实际 $actual）"
-    log "更新包 SHA256 校验通过"
+        || fail "package SHA256 mismatch (expected $PACKAGE_SHA256, actual $actual)"
+    log "Package SHA256 verification passed"
 }
 
 read_password() {
@@ -173,15 +173,15 @@ read_password() {
         return 0
     fi
     [ -r /dev/tty ] \
-        || fail "无法读取密码；请使用 JZ_PASS 环境变量传入"
+        || fail "cannot read a password; provide one through the JZ_PASS environment variable"
     for empty_attempt in 1 2 3; do
-        printf '请输入更新包密码: ' > /dev/tty
+        printf 'Enter update package password: ' > /dev/tty
         IFS= read -rs PASSWORD < /dev/tty
         printf '\n' > /dev/tty
         [ -n "$PASSWORD" ] && return 0
-        log "密码不能为空（第 ${empty_attempt}/3 次）" >&2
+        log "Password cannot be empty (${empty_attempt}/3)" >&2
     done
-    fail "连续三次未输入密码"
+    fail "no password was entered after three attempts"
 }
 
 extract_package() {
@@ -189,25 +189,25 @@ extract_package() {
     for attempt in 1 2 3; do
         read_password
         rm -rf "$destination"
-        mkdir -p "$destination" || fail "无法创建解压目录"
+        mkdir -p "$destination" || fail "cannot create the extraction directory"
         if "$SEVENZIP" x -p"$PASSWORD" -o"$destination" -y "$archive" >/dev/null 2>&1; then
-            log "更新包解密成功"
+            log "Update package decrypted successfully"
             return 0
         fi
-        log "密码错误或压缩包损坏（第 ${attempt}/3 次）" >&2
+        log "Incorrect password or damaged archive (${attempt}/3)" >&2
         if [ -n "${JZ_PASS:-}" ]; then
             break
         fi
         PASSWORD=""
     done
-    fail "连续解密失败，更新已停止"
+    fail "decryption failed after all attempts; the update has stopped"
 }
 
 install_runtime_dependencies
-command -v sha256sum >/dev/null 2>&1 || fail "未找到 sha256sum"
+command -v sha256sum >/dev/null 2>&1 || fail "sha256sum is unavailable"
 
 WORK_DIR=$(mktemp -d /tmp/jzzn-online-update.XXXXXX) \
-    || fail "无法创建临时目录"
+    || fail "cannot create the temporary directory"
 ARCHIVE="$WORK_DIR/$PACKAGE_NAME"
 EXTRACT_DIR="$WORK_DIR/package"
 
@@ -217,12 +217,12 @@ extract_package "$ARCHIVE" "$EXTRACT_DIR"
 
 INSTALL_SCRIPT=$(find "$EXTRACT_DIR" -type f -name install.sh 2>/dev/null \
     | awk -F/ '{print NF "\t" $0}' | sort -n | head -1 | cut -f2-)
-[ -n "$INSTALL_SCRIPT" ] || fail "更新包内未找到 install.sh"
+[ -n "$INSTALL_SCRIPT" ] || fail "install.sh was not found in the update package"
 PACKAGE_ROOT=$(dirname "$INSTALL_SCRIPT")
 
-log "开始执行 ${PRODUCT_VERSION} 原地升级"
+log "Starting the ${PRODUCT_VERSION} in-place upgrade"
 ( cd "$PACKAGE_ROOT" && bash ./install.sh ) \
-    || fail "${PRODUCT_VERSION} 升级失败；请检查 /var/log/jzzn-install.log"
+    || fail "${PRODUCT_VERSION} upgrade failed; inspect /var/log/jzzn-install.log"
 
-log "GitHub 在线更新完成：${PRODUCT_VERSION}（发布 ${RELEASE_TAG}）"
+log "GitHub online update completed: ${PRODUCT_VERSION} (release ${RELEASE_TAG})"
 exit 0
