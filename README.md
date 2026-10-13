@@ -17,7 +17,7 @@ The updater performs the following steps:
 5. Backs up the database and legacy files, then upgrades to v1.2.9.
 6. Migrates to systemd and removes legacy SysV/`rc.local` startup entries only after validation succeeds.
 
-Failed updates retain the temporary directory. The audit log is stored at `/var/log/jzzn-install.log`, and system/database backups are stored under `/root/jzzn-upgrade-backup/`.
+Filesystem and database backups are created under `/root/jzzn-upgrade-backup/` during the upgrade. After every acceptance check passes, that directory and all historical upgrade backups are deleted. Failed updates retain their backups and temporary directory. The audit log is stored at `/var/log/jzzn-install.log`.
 
 ## Options
 
