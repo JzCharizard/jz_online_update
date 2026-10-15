@@ -12,7 +12,7 @@ SHA_NAME="$PACKAGE_NAME.sha256"
 SIG_NAME="$PACKAGE_NAME.sig"
 RELEASE_BASE="https://github.com/JzCharizard/jz_online_update/releases/download/$RELEASE_TAG"
 DOWNLOAD_HOST="github.com"
-PACKAGE_SHA256="c3192797318d53435f611e717444141b3c8ccd62b92d03133135ae0bf5e5adc4"
+PACKAGE_SHA256="d48bb0717612533231cc070fed45e8969820275a088f8f8e48dae3d315a933e1"
 SIGNING_KEY_FINGERPRINT="eda973d767d633f54fc31d892bdd7dacc8fdb64de160f0e349e953f93fb7376e"
 REQUIRED_PACKAGES="ca-certificates curl wget bash coreutils tar openssl p7zip-full postgresql-client iproute2 iputils-ping rsyslog logrotate util-linux procps"
 
@@ -111,7 +111,7 @@ cleanup() {
             log "temporary directory retained: $WORK_DIR"
         else
             rm -rf -- "$WORK_DIR"
-            log "download workspace removed after the stability gate passed"
+            log "download workspace removed after the packaged install.sh completed"
         fi
     fi
 }
@@ -296,6 +296,57 @@ confirm_precheck_warning() {
     fail "operator did not approve the precheck warnings"
 }
 
+remove_legacy_installation_if_present() {
+    local tmp
+    if [ ! -e /etc/init.d/sniff ] && [ ! -L /etc/init.d/sniff ]; then
+        log "legacy /etc/init.d/sniff was not found; running the packaged install.sh directly"
+        return 0
+    fi
+
+    log "legacy /etc/init.d/sniff detected; removing legacy core files and startup paths"
+    systemctl stop sniff-watchdog.timer sniff-watchdog.service controller.service sniff.service \
+        >/dev/null 2>&1 || true
+    if [ -x /root/controller-1.0.0/bin/kill ]; then
+        ( cd /root/controller-1.0.0 && ./bin/kill ) >/dev/null 2>&1 || true
+    fi
+    pkill -TERM -x sniff_daemon 2>/dev/null || true
+    pkill -TERM -x sniff 2>/dev/null || true
+    sleep 2
+    pkill -KILL -x sniff_daemon 2>/dev/null || true
+    pkill -KILL -x sniff 2>/dev/null || true
+
+    if [ -f /etc/rc.local ]; then
+        tmp=$(mktemp)
+        awk '!/controller-1\.0\.0\/bin\/start/ && \
+             !/\/etc\/init\.d\/(sniff|sniff_daemon|check_net\.sh)/ && \
+             !/sniff_daemon/ && !/tmux.*sniff/' \
+            /etc/rc.local > "$tmp"
+        cat "$tmp" > /etc/rc.local
+        rm -f "$tmp"
+    fi
+
+    rm -f /etc/init.d/sniff /etc/init.d/sniff_daemon \
+        /etc/init.d/check_net.sh /etc/init.d/file_manifest.json \
+        /usr/local/bin/sniff /usr/local/bin/sniff.xdp \
+        /usr/local/bin/sniff_daemon /usr/local/bin/sniff_daemon.xdp \
+        /usr/local/bin/sniff-watchdog
+    rm -f /etc/rc?.d/[SK][0-9][0-9]sniff \
+        /etc/rc?.d/[SK][0-9][0-9]sniff_daemon \
+        /etc/rc?.d/[SK][0-9][0-9]check_net.sh 2>/dev/null || true
+    rm -f /etc/systemd/system/sniff.service \
+        /etc/systemd/system/controller.service \
+        /etc/systemd/system/sniff-watchdog.service \
+        /etc/systemd/system/sniff-watchdog.timer \
+        /etc/systemd/system/multi-user.target.wants/sniff.service \
+        /etc/systemd/system/multi-user.target.wants/controller.service \
+        /etc/systemd/system/timers.target.wants/sniff-watchdog.timer
+    systemctl daemon-reload
+
+    [ ! -e /etc/init.d/sniff ] && [ ! -L /etc/init.d/sniff ] \
+        || fail "failed to remove legacy core file /etc/init.d/sniff"
+    log "legacy core files and startup paths removed; running the packaged install.sh"
+}
+
 check_platform
 install_runtime_dependencies
 WORK_DIR=$(mktemp -d /tmp/jzzn-online-update.XXXXXX) || fail "cannot create a temporary directory"
@@ -337,7 +388,8 @@ export JZZN_PACKAGE_SHA256="$PACKAGE_SHA256"
 export JZZN_SIGNATURE_VERIFIED=true
 export JZZN_PRECHECK_DONE=1
 export JZZN_LOCK_HELD=1
-log "starting $PRODUCT_VERSION transactional in-place update"
+remove_legacy_installation_if_present
+log "starting the packaged $PRODUCT_VERSION install.sh"
 ( cd "$EXTRACT_DIR" && bash ./install.sh ) \
     || fail "$PRODUCT_VERSION update did not complete; inspect $TX_LOG, /var/log/jzzn-install.log, and $STATE_FILE"
 
