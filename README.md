@@ -14,10 +14,10 @@ Release assets:
 - `jzzn-v1.2.12-update-linux-x86_64.7z.sha256`
 - `jzzn-v1.2.12-update-linux-x86_64.7z.sig`
 
-Package size: `18422049` bytes.
+Package size: `18422593` bytes.
 
 ```text
-SHA-256: 508a5002930c3b81c6d2e41bd4a40c187de8f8f56a6c4054bada1fc7ee2f7c71
+SHA-256: 29c506b75a4923294772d5e8f17deaef047db8f7d5aedb6ca2a8eb8a9683e7bd
 Public-key fingerprint: eda973d767d633f54fc31d892bdd7dacc8fdb64de160f0e349e953f93fb7376e
 ```
 
