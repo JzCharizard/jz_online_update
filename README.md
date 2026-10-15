@@ -1,29 +1,26 @@
 # JZZN Sniff GitHub Online Updater
 
-This repository provides the GitHub online-update entry point for JZZN Sniff. The product and online release versions are both **v1.2.12**.
-
-## Usage
+Compatibility entry point:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/JzCharizard/jz_online_update/main/jz_online_updater_github.sh | sudo bash
 ```
 
-The updater performs the following steps:
+Current product release: `v1.2.12`.
 
-1. Checks and installs runtime dependencies when necessary.
-2. Downloads the encrypted update package from the GitHub Release.
-3. Verifies the package SHA256.
-4. Prompts for the package password and extracts the package.
-5. Backs up the database and legacy files, then upgrades to v1.2.12.
-6. Migrates to systemd and removes legacy SysV/`rc.local` startup entries only after validation succeeds.
+Release assets:
 
-Filesystem and database backups are created under `/root/jzzn-upgrade-backup/` during the upgrade. After every acceptance check passes, that directory and all historical upgrade backups are deleted. Failed updates retain their backups and temporary directory. The audit log is stored at `/var/log/jzzn-install.log`.
+- `jzzn-v1.2.12-update-linux-x86_64.7z`
+- `jzzn-v1.2.12-update-linux-x86_64.7z.sha256`
+- `jzzn-v1.2.12-update-linux-x86_64.7z.sig`
 
-## Options
+Package size: `18422049` bytes.
 
-- `--keep`: Retain the temporary download directory after a successful update.
-- `JZ_PASS`: Supply the update-package password non-interactively through an environment variable; interactive entry is recommended for normal field use.
+```text
+SHA-256: 508a5002930c3b81c6d2e41bd4a40c187de8f8f56a6c4054bada1fc7ee2f7c71
+Public-key fingerprint: eda973d767d633f54fc31d892bdd7dacc8fdb64de160f0e349e953f93fb7376e
+```
 
-This release no longer uses the legacy `file_manifest.json` incremental-overlay workflow.
+The entry script verifies the platform, minimum runtime dependencies, outer hash, RSA-SHA256 signature, archive paths, inner hashes, and upgrade precheck before stopping services. The transactional installer then creates a verified backup, switches staged files, checks the real Controller HTTP endpoint, database, heartbeat, deployed hashes and runtime configuration, and enforces a 120-second stability gate. A failed deployment triggers one automatic rollback attempt.
 
-The v1.2.12 archive includes `precheck.sh` and `CHANGELOG.md`. After extracting the archive, run `sudo bash precheck.sh` when field validation of CID, licensing, retention capacity, and interface state is required.
+All GitHub user-facing messages are in English. The GitHub, Gitee, and offline deliveries use the same update archive, checksum, and signature bytes.
