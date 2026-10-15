@@ -12,7 +12,7 @@ SHA_NAME="$PACKAGE_NAME.sha256"
 SIG_NAME="$PACKAGE_NAME.sig"
 RELEASE_BASE="https://github.com/JzCharizard/jz_online_update/releases/download/$RELEASE_TAG"
 DOWNLOAD_HOST="github.com"
-PACKAGE_SHA256="717e6c437bdc8f4cb36c1f460010141deb4bd193cccdc7e806604c2d259e3444"
+PACKAGE_SHA256="077fbcbf10f389ab8db7a55614c24f1a07ca36329c756dfc384d47e3ff4eda93"
 SIGNING_KEY_FINGERPRINT="eda973d767d633f54fc31d892bdd7dacc8fdb64de160f0e349e953f93fb7376e"
 REQUIRED_PACKAGES="ca-certificates curl wget bash coreutils tar openssl p7zip-full postgresql-client iproute2 iputils-ping rsyslog logrotate util-linux procps"
 
