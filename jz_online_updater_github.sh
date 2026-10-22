@@ -5,14 +5,14 @@
 
 set -Eeuo pipefail
 
-RELEASE_TAG="v1.2.12"
-PRODUCT_VERSION="v1.2.12"
-PACKAGE_NAME="jzzn-v1.2.12-update-linux-x86_64.7z"
+RELEASE_TAG="v1.2.13"
+PRODUCT_VERSION="v1.2.13"
+PACKAGE_NAME="jzzn-v1.2.13-update-linux-x86_64.7z"
 SHA_NAME="$PACKAGE_NAME.sha256"
 SIG_NAME="$PACKAGE_NAME.sig"
 RELEASE_BASE="https://github.com/JzCharizard/jz_online_update/releases/download/$RELEASE_TAG"
 DOWNLOAD_HOST="github.com"
-PACKAGE_SHA256="c408d322b1f32cdbedf7f682c37b9f588287de0fb4496c650552a9b1aeef4e56"
+PACKAGE_SHA256="9c1b069c032306a98c13288e619bc21b99d8c934a4695966ff971bab1e13a7a5"
 SIGNING_KEY_FINGERPRINT="eda973d767d633f54fc31d892bdd7dacc8fdb64de160f0e349e953f93fb7376e"
 REQUIRED_PACKAGES="ca-certificates curl wget bash coreutils tar openssl p7zip-full postgresql-client iproute2 iputils-ping rsyslog logrotate util-linux procps"
 
@@ -81,8 +81,6 @@ Credential lookup order:
   JZZN_UPDATE_ARCHIVE_PASSWORD environment variable
   /root/.config/jzzn/update-archive-password (mode 0600 required)
   Interactive prompt (up to three attempts)
-
-JZ_PASS remains a v1.2.12 compatibility variable and will be removed later.
 EOF
 }
 
@@ -237,11 +235,6 @@ read_password() {
         [ -n "$PASSWORD" ] || fail "credential file is empty: $credential_file"
         return 0
     fi
-    if [ -n "${JZ_PASS:-}" ]; then
-        PASSWORD=$JZ_PASS
-        log "WARNING: compatibility variable JZ_PASS is in use; migrate to protected credentials"
-        return 0
-    fi
     [ -r /dev/tty ] || fail "cannot read a password interactively; supply protected credentials"
     for attempt in 1 2 3; do
         printf 'Enter update archive password: ' > /dev/tty
@@ -281,7 +274,7 @@ validate_and_extract_archive() {
             return 0
         fi
         log "incorrect password or damaged archive ($attempt/3)"
-        [ -z "${JZZN_UPDATE_ARCHIVE_PASSWORD:-}${JZ_PASS:-}" ] || break
+        [ -z "${JZZN_UPDATE_ARCHIVE_PASSWORD:-}" ] || break
         PASSWORD=""
     done
     fail "package could not be opened after three attempts"

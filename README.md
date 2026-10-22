@@ -6,18 +6,18 @@ Compatibility entry point:
 curl -fsSL https://raw.githubusercontent.com/JzCharizard/jz_online_update/main/jz_online_updater_github.sh | sudo bash
 ```
 
-Current product release: `v1.2.12`.
+Current product release: `v1.2.13`.
 
 Release assets:
 
-- `jzzn-v1.2.12-update-linux-x86_64.7z`
-- `jzzn-v1.2.12-update-linux-x86_64.7z.sha256`
-- `jzzn-v1.2.12-update-linux-x86_64.7z.sig`
+- `jzzn-v1.2.13-update-linux-x86_64.7z`
+- `jzzn-v1.2.13-update-linux-x86_64.7z.sha256`
+- `jzzn-v1.2.13-update-linux-x86_64.7z.sig`
 
-Package size: `18423521` bytes.
+Package size: `18421713` bytes.
 
 ```text
-SHA-256: c408d322b1f32cdbedf7f682c37b9f588287de0fb4496c650552a9b1aeef4e56
+SHA-256: 9c1b069c032306a98c13288e619bc21b99d8c934a4695966ff971bab1e13a7a5
 Public-key fingerprint: eda973d767d633f54fc31d892bdd7dacc8fdb64de160f0e349e953f93fb7376e
 ```
 
