@@ -5,14 +5,14 @@
 
 set -Eeuo pipefail
 
-RELEASE_TAG="v1.2.13"
-PRODUCT_VERSION="v1.2.13"
-PACKAGE_NAME="jzzn-v1.2.13-update-linux-x86_64.7z"
+RELEASE_TAG="v1.2.14"
+PRODUCT_VERSION="v1.2.14"
+PACKAGE_NAME="jzzn-v1.2.14-update-linux-x86_64.7z"
 SHA_NAME="$PACKAGE_NAME.sha256"
 SIG_NAME="$PACKAGE_NAME.sig"
 RELEASE_BASE="https://github.com/JzCharizard/jz_online_update/releases/download/$RELEASE_TAG"
 DOWNLOAD_HOST="github.com"
-PACKAGE_SHA256="9c1b069c032306a98c13288e619bc21b99d8c934a4695966ff971bab1e13a7a5"
+PACKAGE_SHA256="0cc15d1f3c14ea336be462ee53a0d3079a85c7d6d74714e62ff3192b05be0506"
 SIGNING_KEY_FINGERPRINT="eda973d767d633f54fc31d892bdd7dacc8fdb64de160f0e349e953f93fb7376e"
 REQUIRED_PACKAGES="ca-certificates curl wget bash coreutils tar openssl p7zip-full postgresql-client iproute2 iputils-ping rsyslog logrotate util-linux procps"
 
