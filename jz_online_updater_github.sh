@@ -116,6 +116,165 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# BEGIN embedded apt-network-guard.sh
+#!/bin/bash
+# Canonical copy: embedded in curl entry scripts; shipped with install payloads.
+# Do not mask live units: a masked restart can stop a unit and fail to start it.
+
+snapshot_network_before_apt() {
+    local snapshot="/var/lib/jzzn-updater/network-before-apt/$TXID" path target
+    if [ ! -f "$snapshot/complete" ]; then
+        install -d -m 700 "$snapshot" || return 1
+        for path in /etc/netplan /lib/netplan /etc/systemd/network \
+            /etc/NetworkManager/system-connections /run/systemd/network /run/netplan; do
+            [ -e "$path" ] || continue
+            target="$snapshot${path%/*}"
+            mkdir -p "$target" || return 1
+            cp -a "$path" "$target/" || return 1
+        done
+        if command -v ip >/dev/null 2>&1; then
+            ip -details addr show > "$snapshot/addresses.txt" || return 1
+            ip -4 route show table all > "$snapshot/routes-v4.txt" || return 1
+            ip -6 route show table all > "$snapshot/routes-v6.txt" || return 1
+        fi
+        touch "$snapshot/complete" || return 1
+        log "Network configuration and live addresses backed up before APT: $snapshot"
+    fi
+    # Do not let package generators discard the only, volatile network config.
+    for path in /etc/netplan /lib/netplan; do
+        [ -d "$path" ] || continue
+        [ -z "$(find "$path" -maxdepth 1 -type f \( -name '*.yaml' -o -name '*.yml' \) -print -quit)" ] || return 0
+    done
+    for path in /etc/systemd/network; do
+        [ -d "$path" ] || continue
+        [ -z "$(find "$path" -maxdepth 1 -type f -name '*.network' -print -quit)" ] || return 0
+    done
+    path=/etc/NetworkManager/system-connections
+    if [ -d "$path" ] && [ -n "$(find "$path" -maxdepth 1 -type f -name '*.nmconnection' -print -quit)" ]; then
+        return 0
+    fi
+    log "BLOCK: no persistent Netplan/networkd/NetworkManager configuration found; restore a valid network configuration before retrying. Snapshot: $snapshot" >&2
+    return 1
+}
+
+run_package_command() (
+    # A subshell owns the traps; an APT error must not bypass guard restoration.
+    set -Eeuo pipefail
+    local guard_dir policy=/usr/sbin/policy-rc.d unit file state rc=0
+    local policy_installed=0 reload_needed=0 restore_failed=0
+    local -a dropins=() active_units=() original_invocations=()
+    local -a units=(
+        ssh.service ssh.socket sshd.service sshd.socket
+        systemd-networkd.service systemd-networkd.socket systemd-networkd-wait-online.service
+        NetworkManager.service network-manager.service networking.service networkd-dispatcher.service
+        systemd-resolved.service systemd-udevd.service systemd-logind.service dbus.service dbus-broker.service
+    )
+    snapshot_network_before_apt || return 1
+    guard_dir=$(mktemp -d /var/lib/jzzn-updater/apt-guard.XXXXXX) || return 1
+    chmod 700 "$guard_dir" || return 1
+
+    restore_package_guard() {
+        local result=$? dropin
+        trap - EXIT HUP INT TERM
+        if [ "$policy_installed" -eq 1 ]; then
+            if cmp -s "$policy" "$guard_dir/policy"; then
+                if [ -e "$guard_dir/original-policy" ] || [ -L "$guard_dir/original-policy" ]; then
+                    cp -a "$guard_dir/original-policy" "$policy.jzzn-${guard_dir##*/}" \
+                        && mv -Tf "$policy.jzzn-${guard_dir##*/}" "$policy" || restore_failed=1
+                else
+                    rm -f -- "$policy" || restore_failed=1
+                fi
+            else
+                echo "ERROR: policy-rc.d changed during APT; original retained at $guard_dir" >&2
+                restore_failed=1
+            fi
+        fi
+        for dropin in "${dropins[@]}"; do
+            rm -f -- "$dropin" || restore_failed=1
+            rmdir -- "${dropin%/*}" 2>/dev/null || true
+        done
+        if [ "$reload_needed" -eq 1 ]; then
+            systemctl daemon-reload || restore_failed=1
+        fi
+        if [ "$restore_failed" -eq 0 ]; then
+            rm -f -- "$guard_dir/original-policy" "$guard_dir/delegate" "$guard_dir/policy" "$guard_dir/restore-policy"
+            rmdir -- "$guard_dir" || restore_failed=1
+        fi
+        if [ "$restore_failed" -ne 0 ]; then
+            echo "ERROR: APT guard restoration needs manual attention: $guard_dir" >&2
+            [ "$result" -ne 0 ] || result=1
+        fi
+        exit "$result"
+    }
+    trap restore_package_guard EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
+    if [ -e "$policy" ] || [ -L "$policy" ]; then
+        [ -x "$policy" ] || { echo "ERROR: existing policy-rc.d is not executable" >&2; return 1; }
+        if grep -q '^# JZZN temporary APT guard:' "$policy"; then
+            echo "ERROR: unfinished APT guard detected; restore its saved original policy before retrying" >&2
+            return 1
+        fi
+        cp -a "$policy" "$guard_dir/original-policy" || return 1
+        cp -pL "$policy" "$guard_dir/delegate" || return 1
+    fi
+    cat > "$guard_dir/policy" <<EOF || return 1
+#!/bin/sh
+# JZZN temporary APT guard: $guard_dir
+for arg in "\$@"; do
+    case "\${arg##*/}" in
+        ssh|sshd|ssh.*|sshd.*|ssh@*|sshd@*|systemd-networkd*|NetworkManager*|network-manager*|networking*|networkd-dispatcher*|systemd-resolved*|systemd-udevd*|systemd-logind*|dbus|dbus.*|dbus-broker*)
+            echo "JZZN: package service action deferred to preserve networking/SSH: \$*" >&2
+            exit 101 ;;
+    esac
+done
+if [ -x '$guard_dir/delegate' ]; then exec '$guard_dir/delegate' "\$@"; fi
+exit 0
+EOF
+    [ -s "$guard_dir/policy" ] || return 1
+    chmod 755 "$guard_dir/policy" || return 1
+    # Mark ownership before the atomic replacement so signal cleanup is safe.
+    policy_installed=1
+    cp "$guard_dir/policy" "$policy.jzzn-${guard_dir##*/}" || return 1
+    mv -Tf "$policy.jzzn-${guard_dir##*/}" "$policy" || return 1
+    for unit in "${units[@]}"; do
+        if [ "$(systemctl show -p LoadState --value "$unit" 2>/dev/null || true)" = "not-found" ]; then
+            continue
+        fi
+        state=$(systemctl show -p ActiveState --value "$unit") || return 1
+        if [ "$state" = "active" ]; then
+            active_units+=("$unit")
+            original_invocations+=("$(systemctl show -p InvocationID --value "$unit")")
+        fi
+        file="/run/systemd/system/$unit.d/90-jzzn-${guard_dir##*/}.conf"
+        mkdir -p "${file%/*}" || return 1
+        dropins+=("$file")
+        printf '[Unit]\nRefuseManualStop=yes\n' > "$file" || return 1
+    done
+    reload_needed=1
+    systemctl daemon-reload || return 1
+    for unit in "${units[@]}"; do
+        if [ "$(systemctl show -p LoadState --value "$unit" 2>/dev/null || true)" = "not-found" ]; then continue; fi
+        [ "$(systemctl show -p RefuseManualStop --value "$unit")" = "yes" ] \
+            || { echo "ERROR: cannot protect $unit from package restarts" >&2; return 1; }
+    done
+    log "APT guard active: automatic service restarts suspended; networking and SSH protected"
+    # SUSPEND disables Ubuntu's APT hook even when it specifies -m u.
+    DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l NEEDRESTART_SUSPEND=1 "$@" || rc=$?
+    for file in "${!active_units[@]}"; do
+        unit=${active_units[$file]}
+        if [ "$(systemctl show -p ActiveState --value "$unit")" != "active" ] \
+            || [ "$(systemctl show -p InvocationID --value "$unit")" != "${original_invocations[$file]}" ]; then
+            echo "ERROR: protected service changed during APT: $unit" >&2
+            rc=1
+        fi
+    done
+    return "$rc"
+)
+# END embedded apt-network-guard.sh
+
 check_platform() {
     [ -r /etc/os-release ] || fail "cannot identify the operating system"
     # shellcheck disable=SC1091
@@ -159,9 +318,9 @@ install_runtime_dependencies() {
     done
     if [ -n "$missing" ]; then
         log "installing missing minimum runtime dependencies:${missing}"
-        DEBIAN_FRONTEND=noninteractive apt-get "${APT_GET_IP_OPTIONS[@]}" update || fail "apt-get update failed"
+        run_package_command apt-get "${APT_GET_IP_OPTIONS[@]}" update || fail "apt-get update failed"
         # shellcheck disable=SC2086
-        DEBIAN_FRONTEND=noninteractive apt-get "${APT_GET_IP_OPTIONS[@]}" install -y $missing \
+        run_package_command apt-get "${APT_GET_IP_OPTIONS[@]}" install -y $missing \
             || fail "runtime dependency installation failed"
     fi
     find_7z || fail "7z/7za/7zr was not found"
