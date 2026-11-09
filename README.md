@@ -1,12 +1,14 @@
 # JZZN Sniff GitHub Online Updater
 
+When missing runtime dependencies require APT, the entry checks for both a global IPv6 address and an IPv6 default route. If IPv6 is unavailable, only those APT commands automatically use `Acquire::ForceIPv4=true`.
+
 Compatibility entry point:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/JzCharizard/jz_online_update/main/jz_online_updater_github.sh | sudo bash
 ```
 
-Current product release: `v1.2.13`.
+Current product release: `v1.2.14`.
 
 Release assets:
 

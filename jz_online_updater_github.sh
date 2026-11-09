@@ -29,6 +29,7 @@ INSTALL_STARTED=0
 FINAL_STATUS="initializing"
 FAIL_REASON=""
 SIGNATURE_STATUS="false"
+APT_GET_IP_OPTIONS=()
 
 log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*"; }
 
@@ -135,19 +136,32 @@ find_7z() {
     return 1
 }
 
+configure_apt_ip_family() {
+    APT_GET_IP_OPTIONS=()
+    if ! command -v ip >/dev/null 2>&1 \
+       || ! ip -6 addr show scope global 2>/dev/null | grep -q 'inet6 ' \
+       || ! ip -6 route show default 2>/dev/null | grep -q '^default'; then
+        APT_GET_IP_OPTIONS=(-o Acquire::ForceIPv4=true)
+        log "no usable global IPv6 address and default route were detected; APT will automatically use IPv4"
+    else
+        log "usable IPv6 configuration detected; APT will keep the system IP-family preference"
+    fi
+}
+
 install_runtime_dependencies() {
     local package missing=""
     command -v apt-get >/dev/null 2>&1 || fail "apt-get is unavailable"
     command -v dpkg-query >/dev/null 2>&1 || fail "dpkg-query is unavailable"
+    configure_apt_ip_family
     for package in $REQUIRED_PACKAGES; do
         dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q '^install ok installed$' \
             || missing="$missing $package"
     done
     if [ -n "$missing" ]; then
         log "installing missing minimum runtime dependencies:${missing}"
-        DEBIAN_FRONTEND=noninteractive apt-get update || fail "apt-get update failed"
+        DEBIAN_FRONTEND=noninteractive apt-get "${APT_GET_IP_OPTIONS[@]}" update || fail "apt-get update failed"
         # shellcheck disable=SC2086
-        DEBIAN_FRONTEND=noninteractive apt-get install -y $missing \
+        DEBIAN_FRONTEND=noninteractive apt-get "${APT_GET_IP_OPTIONS[@]}" install -y $missing \
             || fail "runtime dependency installation failed"
     fi
     find_7z || fail "7z/7za/7zr was not found"
