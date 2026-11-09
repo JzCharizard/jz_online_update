@@ -17,13 +17,13 @@ Current product release: `v1.2.14`.
 Release assets:
 
 - `jzzn-v1.2.13-update-linux-x86_64.7z`
-- `jzzn-v1.2.13-update-linux-x86_64.7z.sha256`
+- `jzzn-v1.2.14-update-linux-x86_64.7z.sha256`
 - `jzzn-v1.2.13-update-linux-x86_64.7z.sig`
 
-Package size: `18421713` bytes.
+Package size: `18444161` bytes.
 
 ```text
-SHA-256: 9c1b069c032306a98c13288e619bc21b99d8c934a4695966ff971bab1e13a7a5
+SHA-256: 0cc15d1f3c14ea336be462ee53a0d3079a85c7d6d74714e62ff3192b05be0506
 Public-key fingerprint: eda973d767d633f54fc31d892bdd7dacc8fdb64de160f0e349e953f93fb7376e
 ```
 
