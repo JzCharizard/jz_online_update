@@ -1,8 +1,13 @@
 # JZZN Sniff GitHub Online Updater
 
+## 2026-11-12: preserve networks without persistent YAML
+
+When dependency installation needs APT but no persistent Netplan/networkd/NM configuration exists, a transition Netplan snapshot is generated from actual live addresses, prefixes, routes, DNS, MAC and MTU. No interface renaming, apply/try, network or SSH service restart occurs. Incomplete or unsupported network topologies stop safely. APT remains protected by needrestart suspension, temporary policy-rc.d and RefuseManualStop. The updater does not initialize product NIC roles or overwrite existing persistent network configuration. Product-service restarts remain part of upgrading.
+
+
 ## 2026-11-09: preserve networking and SSH during dependency installation
 
-Every APT/dpkg command suspends needrestart and uses a temporary policy-rc.d plus runtime RefuseManualStop protection for network/SSH services. Existing administrator policies are preserved and restored on success, failure or handled signals. Network files and live addresses are backed up before the first package command. Hosts without recognizable persistent network configuration stop before APT; restore valid configuration from the console first. IPv4 fallback remains enabled. Product service restarts required by an update are unaffected; no network/SSH restart is requested by the updater.
+Every APT/dpkg command suspends needrestart and uses a temporary policy-rc.d plus runtime RefuseManualStop protection for network/SSH services. Existing administrator policies are preserved and restored on success, failure or handled signals. Network files and live addresses are backed up before the first package command. Missing persistent network configuration is snapshotted into a transition YAML; unsupported/incomplete networks stop safely. IPv4 fallback remains enabled. Product service restarts required by an update are unaffected; no network/SSH restart is requested by the updater.
 
 When missing runtime dependencies require APT, the entry checks for both a global IPv6 address and an IPv6 default route. If IPv6 is unavailable, only those APT commands automatically use `Acquire::ForceIPv4=true`.
 

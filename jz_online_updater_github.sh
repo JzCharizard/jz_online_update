@@ -153,6 +153,10 @@ snapshot_network_before_apt() {
     if [ -d "$path" ] && [ -n "$(find "$path" -maxdepth 1 -type f -name '*.nmconnection' -print -quit)" ]; then
         return 0
     fi
+    if declare -F generate_transition_netplan >/dev/null; then
+        generate_transition_netplan "$snapshot"
+        return $?
+    fi
     log "BLOCK: no persistent Netplan/networkd/NetworkManager configuration found; restore a valid network configuration before retrying. Snapshot: $snapshot" >&2
     return 1
 }
@@ -272,6 +276,145 @@ EOF
         fi
     done
     return "$rc"
+)
+
+#!/bin/bash
+# Ordinary fresh-install only. Static snapshot for the dependency-install phase;
+# the existing product NIC selection later replaces this temporary YAML.
+generate_transition_netplan() (
+    set -Eeuo pipefail
+    local snapshot=$1 staging target=/etc/netplan/00-jzzn-install-transition.yaml
+    command -v python3 >/dev/null 2>&1 || { log "ERROR: python3 is required to snapshot an unconfigured network" >&2; return 1; }
+    staging=$(mktemp -d /tmp/jzzn-netplan-transition.XXXXXX) || return 1
+    trap 'rm -rf -- "$staging"' EXIT
+    mkdir -p "$staging/etc/netplan" || return 1
+    python3 - "$staging/etc/netplan/transition.yaml" "$snapshot" <<'PY' || return 1
+import ipaddress
+import json
+import pathlib
+import subprocess
+import sys
+
+def command(args):
+    return subprocess.check_output(args, text=True)
+
+def ip(*args):
+    return json.loads(command(['ip', '-j', *args]))
+
+def dns_for(name):
+    try:
+        value = command(['resolvectl', 'dns', name]).split(':', 1)[1].split()
+        return [v for v in value if valid_ip(v)]
+    except (OSError, subprocess.CalledProcessError, IndexError):
+        return []
+
+def valid_ip(value):
+    try:
+        ipaddress.ip_address(value.split('%')[0]); return True
+    except ValueError:
+        return False
+
+try:
+    links = ip('-details', 'link', 'show')
+    addresses = ip('address', 'show')
+    routes = ip('-4', 'route', 'show', 'table', 'all') + ip('-6', 'route', 'show', 'table', 'all')
+    rules = ip('-4', 'rule', 'show') + ip('-6', 'rule', 'show')
+    if any(r.get('table') not in ('local', 'main', 'default', 254, 255, 253)
+           or r.get('src', 'all') != 'all' or r.get('dst', 'all') != 'all'
+           or any(k in r for k in ('fwmark', 'fwmask', 'iif', 'oif', 'uidrange')) for r in rules):
+        raise ValueError('custom policy routing requires manual network configuration')
+    result = {}
+    for link in links:
+        name = link['ifname']
+        if name == 'lo':
+            continue
+        if link.get('link_type') != 'ether' or link.get('master') or link.get('linkinfo', {}).get('info_kind'):
+            raise ValueError('bridge/bond/VLAN/tunnel topology requires manual configuration: ' + name)
+        mac = link.get('address', '')
+        if not mac or len(mac.split(':')) != 6:
+            raise ValueError('missing Ethernet MAC: ' + name)
+        config = {'match': {'macaddress': mac}, 'dhcp4': False, 'dhcp6': False,
+                  'accept-ra': False, 'optional': True, 'mtu': link['mtu']}
+        current = next(a for a in addresses if a['ifname'] == name)
+        addrs = sorted({str(ipaddress.ip_interface(str(a['local']) + '/' + str(a['prefixlen'])))
+                        for a in current.get('addr_info', []) if a.get('scope') == 'global'})
+        if addrs:
+            config['addresses'] = addrs
+        servers = dns_for(name)
+        if servers:
+            config['nameservers'] = {'addresses': servers}
+            try:
+                domains = command(['resolvectl', 'domain', name]).split(':', 1)[1].split()
+                if domains and domains != ['n/a']:
+                    config['nameservers']['search'] = domains
+            except (OSError, subprocess.CalledProcessError, IndexError):
+                pass
+        result[name] = config
+    for route in routes:
+        table = route.get('table', 'main')
+        if table in ('local', 255) or route.get('type', 'unicast') != 'unicast':
+            continue
+        if table not in ('main', 254):
+            raise ValueError('custom route table requires manual configuration')
+        if route.get('protocol') == 'kernel':
+            continue  # connected routes follow the exact address prefixes
+        name = route.get('dev')
+        if name not in result or route.get('nexthops') or route.get('nhid'):
+            raise ValueError('unsupported route/device: ' + json.dumps(route))
+        item = {'to': route['dst']}
+        if route.get('gateway'):
+            item['via'] = route['gateway']
+        else:
+            item['scope'] = route.get('scope', 'link')
+        if 'metric' in route:
+            item['metric'] = route['metric']
+        if 'onlink' in route.get('flags', []):
+            item['on-link'] = True
+        if route.get('prefsrc'):
+            item['from'] = route['prefsrc']
+        bucket = result[name].setdefault('routes', [])
+        if item not in bucket:
+            bucket.append(item)
+    if not any(c.get('addresses') for c in result.values()):
+        raise ValueError('no current global IP addresses to preserve')
+    if not any(c.get('nameservers') for c in result.values()):
+        servers = []
+        for file in ['/run/systemd/resolve/resolv.conf', '/etc/resolv.conf']:
+            path = pathlib.Path(file)
+            if not path.exists():
+                continue
+            for line in path.read_text().splitlines():
+                parts = line.split()
+                if len(parts) >= 2 and parts[0] == 'nameserver' and valid_ip(parts[1]) and parts[1] != '127.0.0.53':
+                    if parts[1] not in servers:
+                        servers.append(parts[1])
+            if servers:
+                break
+        if not servers:
+            raise ValueError('cannot identify current upstream DNS servers')
+        name = next((n for n, c in result.items() if any(r['to'] == 'default' for r in c.get('routes', []))), None)
+        if name is None:
+            name = next(n for n, c in result.items() if c.get('addresses'))
+        result[name]['nameservers'] = {'addresses': servers}
+    data = {'network': {'version': 2, 'renderer': 'networkd', 'ethernets': result}}
+    # JSON is valid YAML and avoids quoting mistakes without PyYAML dependencies.
+    pathlib.Path(sys.argv[1]).write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
+    pathlib.Path(sys.argv[2], 'transition-network-source.json').write_text(
+        json.dumps({'links': links, 'addresses': addresses, 'routes': routes, 'rules': rules}, indent=2) + '\n', encoding='utf-8')
+except (ValueError, KeyError, StopIteration, OSError, subprocess.CalledProcessError) as error:
+    print('ERROR: cannot safely create transition Netplan: ' + str(error), file=sys.stderr)
+    sys.exit(1)
+PY
+    # Validate in a separate root only: never generate/apply live network state.
+    if command -v netplan >/dev/null 2>&1; then
+        netplan generate --root-dir "$staging" || return 1
+    fi
+    mkdir -p /etc/netplan || return 1
+    [ ! -e "$target" ] && [ ! -L "$target" ] || { log "ERROR: transition file unexpectedly exists" >&2; return 1; }
+    install -m 600 "$staging/etc/netplan/transition.yaml" "$target.pending" || return 1
+    mv -Tf "$target.pending" "$target" || return 1
+    cp -a "$target" "$snapshot/transition-netplan.yaml" || return 1
+    log "Transition Netplan created from current IP/prefix/routes/DNS: $target (no rename, apply or service restart)"
 )
 # END embedded apt-network-guard.sh
 
