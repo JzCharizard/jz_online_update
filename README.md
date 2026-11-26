@@ -1,4 +1,4 @@
-# JZZN Sniff GitHub Online Updater (v1.2.14)
+# JZZN Sniff GitHub Online Updater (v1.2.15)
 
 Signed transactional online updater for Ubuntu Server x86_64 devices.
 
@@ -10,9 +10,9 @@ curl -fsSL https://raw.githubusercontent.com/JzCharizard/jz_online_update/main/j
 
 ## Release Metadata
 
-- Product Version: `v1.2.14`
-- Release Tag: `v1.2.14`
-- Package: `jzzn-v1.2.14-update-linux-x86_64.7z`
-- Size: `18444001` bytes
-- SHA-256: `6afd8341daa1585cbdf3e3b7c6ea70c24d8bacfc0f12ec987c4eca32add8af47`
+- Product Version: `v1.2.15`
+- Release Tag: `v1.2.15`
+- Package: `jzzn-v1.2.15-update-linux-x86_64.7z`
+- Size: `18428513` bytes
+- SHA-256: `ec15884be7aedebded1a167ccd3538fd292824cd84c58fb18863ec44d5eedb80`
 - Signing Key Fingerprint: `eda973d767d633f54fc31d892bdd7dacc8fdb64de160f0e349e953f93fb7376e`
