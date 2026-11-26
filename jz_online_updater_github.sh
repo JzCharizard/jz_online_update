@@ -466,6 +466,13 @@ install_runtime_dependencies() {
         run_package_command apt-get "${APT_GET_IP_OPTIONS[@]}" install -y $missing \
             || fail "runtime dependency installation failed"
     fi
+    if ! command -v ntpdate >/dev/null 2>&1; then
+        log "ntpdate not detected; installing ntpdate"
+        [ -n "$missing" ] || run_package_command apt-get "${APT_GET_IP_OPTIONS[@]}" update || fail "apt-get update failed"
+        run_package_command apt-get "${APT_GET_IP_OPTIONS[@]}" install -y ntpdate \
+            || run_package_command apt-get "${APT_GET_IP_OPTIONS[@]}" install -y ntpsec-ntpdate \
+            || fail "failed to install ntpdate"
+    fi
     find_7z || fail "7z/7za/7zr was not found"
     for command_name in sha256sum openssl curl tar flock; do
         command -v "$command_name" >/dev/null 2>&1 || fail "required command is missing: $command_name"
